@@ -7,6 +7,8 @@
  *        mod_low up) are the chord block DIM MIN MAJ SUS / 6 m7 M7 9; every other note is a root.
  *   out: the voiced chord (stream MAIN), optionally the bass (stream BASS) and the raw chord (stream RAW),
  *        each on its own MIDI channel, scheduled by cr_tick (strum, slop, arp, pattern, harp).
+ *        usb_out = Copy / Only also sends those generated notes out of Move's external MIDI port (cable 2:
+ *        USB-A devices and a computer on USB-C, "Ableton Move Standalone Port"), so Live can record them.
  *
  * Realtime rules (Schwung docs/MODULES.md "There is no control thread"): every entry point runs on the SPI
  * audio callback. Nothing here allocates after create_instance, does I/O or logs.
@@ -25,6 +27,8 @@
 typedef struct { uint8_t b[3]; } qmsg_t;
 
 typedef enum { MAP_SEMI = 0, MAP_WHITE = 1 } modmap_t;
+typedef enum { USB_OFF = 0, USB_COPY = 1, USB_ONLY = 2 } usbout_t;
+#define XN 512                                   /* power of two; USB-MIDI packets waiting for the host ring */
 enum { PERF_OFF = 0 };                           /* perform enum: 0 Off, 1..5 = CR_PM_* + 1 */
 enum { BASS_OFF = 0 };                           /* bass enum: 0 Off, 1..4 = CR_BASS_* + 1 */
 
@@ -33,6 +37,13 @@ typedef struct {
     qmsg_t q[QN];
     uint32_t qh, qt;                             /* head (read), tail (write) */
     uint32_t q_dropped;
+
+    /* external (USB) out: the host ring is 64 packets and drops the newest when full, so we keep our own
+     * queue and only advance it on a packet the host accepted. A dropped note-off would hang in Live. */
+    uint8_t xq[XN][4];
+    uint32_t xh, xt;
+    uint32_t x_dropped;
+    int usb_out;
     uint64_t samples;
     int sr;
 
@@ -69,6 +80,33 @@ static int q_drain(inst_t *in, uint8_t out[][3], int lens[], int n, int max)
     return n;
 }
 
+static void x_push(inst_t *in, uint8_t s, uint8_t d1, uint8_t d2)
+{
+    uint8_t *p;
+    if (in->xt - in->xh >= XN) { in->x_dropped++; return; }
+    p = in->xq[in->xt & (XN - 1)];
+    p[0] = (uint8_t)((2 << 4) | (s >> 4));       /* cable 2 (external), CIN = status high nibble */
+    p[1] = s; p[2] = d1; p[3] = d2;
+    in->xt++;
+}
+
+/* hand queued packets to the host until it refuses one; the rest wait for the next call */
+static void x_flush(inst_t *in)
+{
+    if (!g_host || !g_host->midi_send_external) { in->xh = in->xt; return; }
+    while (in->xh != in->xt) {
+        if (g_host->midi_send_external(in->xq[in->xh & (XN - 1)], 4) <= 0) break;
+        in->xh++;
+    }
+}
+
+/* every generated message goes through here: to the next slot, to USB, or both */
+static void emit(inst_t *in, uint8_t s, uint8_t d1, uint8_t d2)
+{
+    if (in->usb_out != USB_ONLY) q_push(in, s, d1, d2);
+    if (in->usb_out != USB_OFF)  x_push(in, s, d1, d2);
+}
+
 static uint8_t stream_ch(const inst_t *in, cr_stream_t s)
 {
     if (s == CR_STREAM_BASS && in->ch_bass) return (uint8_t)(in->ch_bass - 1);
@@ -86,20 +124,20 @@ static void cb_on(void *ud, cr_stream_t s, uint8_t note, uint8_t vel)
     inst_t *in = (inst_t *)ud;
     uint8_t ch = stream_ch(in, s);
     chmap_of(in)->ch[s][note & 127] = ch;
-    q_push(in, (uint8_t)(0x90 | ch), note & 127, vel ? vel : 1);
+    emit(in, (uint8_t)(0x90 | ch), note & 127, vel ? vel : 1);
 }
 
 static void cb_off(void *ud, cr_stream_t s, uint8_t note)
 {
     inst_t *in = (inst_t *)ud;
     uint8_t ch = chmap_of(in)->ch[s][note & 127];
-    q_push(in, (uint8_t)(0x80 | ch), note & 127, 0);
+    emit(in, (uint8_t)(0x80 | ch), note & 127, 0);
 }
 
 static void cb_all(void *ud, cr_stream_t s)
 {
     inst_t *in = (inst_t *)ud;
-    q_push(in, (uint8_t)(0xB0 | stream_ch(in, s)), 123, 0);
+    emit(in, (uint8_t)(0xB0 | stream_ch(in, s)), 123, 0);
 }
 
 /* the chord zone: returns 0..7 (cr_mod_t) or -1 */
@@ -135,6 +173,7 @@ static const char *KEYS[]      = { "Off", "C", "C#", "D", "D#", "E", "F", "F#", 
 static const char *SCALES[]    = { "Major", "Minor" };
 static const char *BASS[]      = { "Off", "Chords", "Unison", "Single", "Solo" };
 static const char *ONOFF[]     = { "Off", "On" };
+static const char *USBOUT[]    = { "Off", "Copy", "Only" };
 static const char *MODMAP[]    = { "Semitones", "White keys" };
 static const char *DIV[]       = { "2/1", "1/1", "1/2", "1/2T", "1/4", "1/4T",
                                    "1/8", "1/8T", "1/16", "1/16T", "1/32", "1/32T" };
@@ -246,6 +285,10 @@ static void set_one(inst_t *in, const char *key, const char *val)
                                           cr_set_stream(&in->cr, CR_STREAM_RAW, in->raw_on); }
     else if (!strcmp(key, "ch_bass"))   in->ch_bass = parse_int(val, 0, 16, in->ch_bass);
     else if (!strcmp(key, "ch_raw"))    in->ch_raw = parse_int(val, 0, 16, in->ch_raw);
+    else if (!strcmp(key, "usb_out"))   { int u = parse_enum(val, USBOUT, NE(USBOUT), in->usb_out);
+                                          /* release what sounds under the old routing, so neither the slot
+                                           * nor Live is left with a hanging note */
+                                          if (u != in->usb_out) { cr_panic(&in->cr); in->usb_out = u; } }
     else if (!strcmp(key, "sync_bpm"))  in->sync_bpm = parse_enum(val, ONOFF, 2, in->sync_bpm);
     else if (!strcmp(key, "bpm"))       cr_set_tempo(&in->cr, parse_int(val, 20, 300, in->cr.bpm));
     /* the current perform mode's parameters */
@@ -310,10 +353,12 @@ static int fx_process_midi(void *instance, const uint8_t *msg, int len,
         } else {
             cr_key(&in->cr, (uint8_t)note, (uint8_t)(vel ? vel : 64), down);
         }
+        x_flush(in);
         return q_drain(in, out, lens, 0, max);
     }
     if (ty == 0xB0 && len >= 3 && (msg[1] == 123 || msg[1] == 120)) {
         cr_panic(&in->cr);
+        x_flush(in);
         return q_drain(in, out, lens, 0, max);
     }
     /* everything else (CC, pitch bend, aftertouch, clock) passes through */
@@ -339,6 +384,7 @@ static int fx_tick(void *instance, int frames, int sample_rate,
         }
     }
     cr_tick(&in->cr, (uint32_t)(in->samples * 1000u / (uint64_t)in->sr));
+    x_flush(in);
     return q_drain(in, out, lens, 0, max);
 }
 
@@ -370,6 +416,7 @@ static int fx_get_param(void *instance, const char *key, char *buf, int n)
     if (!strcmp(key, "ch_bass"))   return snprintf(buf, n, "%d", in->ch_bass);
     if (!strcmp(key, "ch_raw"))    return snprintf(buf, n, "%d", in->ch_raw);
     if (!strcmp(key, "sync_bpm"))  return snprintf(buf, n, "%s", ONOFF[in->sync_bpm]);
+    if (!strcmp(key, "usb_out"))   return snprintf(buf, n, "%s", USBOUT[in->usb_out]);
     if (!strcmp(key, "bpm"))       return snprintf(buf, n, "%d", in->cr.bpm);
     if (!strcmp(key, "rate"))      return snprintf(buf, n, "%d", cr_get_param(&in->cr, (cr_pmode_t)pm, CR_P_RATE));
     if (!strcmp(key, "div"))       return snprintf(buf, n, "%s", DIV[clampi(cr_get_param(&in->cr, (cr_pmode_t)pm, CR_P_DIV), 0, NE(DIV) - 1)]);
@@ -389,10 +436,10 @@ static int fx_get_param(void *instance, const char *key, char *buf, int n)
         return snprintf(buf, n,
             "{\"voicing\":%d,\"playstyle\":%d,\"perform\":%d,\"key\":%d,\"scale\":%d,\"bass\":%d,"
             "\"bass_oct\":%d,\"sticky\":%d,\"transpose\":%d,\"mod_low\":%d,\"mod_map\":%d,\"raw\":%d,"
-            "\"ch_bass\":%d,\"ch_raw\":%d,\"sync_bpm\":%d}",
+            "\"ch_bass\":%d,\"ch_raw\":%d,\"sync_bpm\":%d,\"usb_out\":%d}",
             in->voicing, in->playstyle, in->perform, in->key, in->scale, in->bass, in->bass_oct,
             in->sticky, in->transpose, in->mod_low, in->mod_map, in->raw_on, in->ch_bass, in->ch_raw,
-            in->sync_bpm);
+            in->sync_bpm, in->usb_out);
     return -1;
 }
 

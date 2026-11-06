@@ -28,6 +28,33 @@ Ableton Move. Va delante de cualquier sinte del Signal Chain: una mano toca raí
 
 Los parámetros de la página Perform son los del modo Perform activo.
 
+En la página Setup, después de los 8 knobs, está **USB MIDI Out** (ver abajo).
+
+## Con Ableton Live
+
+Basta un cable USB-C **de datos** entre el Move y el ordenador. En Live el Move aparece como
+**"Ableton Move Standalone Port"**. Es el único de sus puertos USB-C que llega a Schwung.
+
+**Live → Move:** una pista MIDI de Live con *MIDI To* = Move Standalone Port, en el canal del slot
+(1-4). ChoralRoot convierte sus notas en acordes y suena el sinte del slot. Los patches ya llevan
+`"input": "both"`.
+
+**Move → Live (USB MIDI Out):** Setup → USB MIDI Out.
+
+| Valor | Qué hace |
+| --- | --- |
+| Off | Por defecto. Las notas generadas solo van al sinte del slot. |
+| Copy | Las notas van al sinte **y** salen por USB, en los mismos canales. |
+| Only | Solo salen por USB. El sinte del slot calla, para tocar un instrumento de Live. |
+
+En Live, en una pista MIDI: *MIDI From* = Move Standalone Port, monitor In o Auto, y graba.
+
+- Salen las notas **generadas** (acorde, bajo, raw, strum, arp…), no las teclas que tocas.
+- La salida externa de Move es compartida, así que también llega a lo que tengas en el USB-A.
+- **Evita bucles:** no devuelvas esa misma pista de Live al Move. Si Live envía y recibe del Move,
+  usa canales distintos para cada dirección.
+- Al cambiar USB MIDI Out se sueltan todas las notas, para que no se quede ninguna colgada.
+
 ## Compilar y probar
 
 ```sh
@@ -56,12 +83,13 @@ Están en `chain_patches/`, y también dentro del tarball, en `choralroot/chain_
 
 **Cómo cargarlos:** en la Shadow UI, entra en un slot y abre el navegador de patches. Gira el jog para elegir y púlsalo para cargar.
 
-## Limitaciones conocidas (v0.1)
+## Limitaciones conocidas (v0.2)
 
 - En los layouts isomórficos de Move (4as) la misma nota aparece en varios pads, así que la zona de acordes
   también suena en otros pads. Funciona mejor con un teclado externo o con un layout donde las notas no se
   repitan. Una superficie de pads propia es la fase 2.
 - No hay pantalla propia todavía: solo las páginas de knobs.
+- USB MIDI Out está probado en el host, no todavía en un Move real.
 - Los chord pads y el looper de ChoralRoot no están portados.
 
 ## Licencia
