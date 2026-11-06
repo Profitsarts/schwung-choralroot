@@ -1,0 +1,33 @@
+{
+    "name": "ChoralRoot Poly Dreams",
+    "version": 1,
+    "chain": {
+        "input": "both",
+        "midi_fx": [
+            {
+                "type": "choralroot",
+                "perform": "Strum",
+                "rate": "40",
+                "voicing": "0",
+                "bass": "Off"
+            }
+        ],
+        "synth": {
+            "module": "obxd",
+            "config": {
+                "preset": 84
+            }
+        },
+        "audio_fx": [
+            {
+                "type": "freeverb",
+                "params": {
+                    "room_size": 0.8,
+                    "damping": 0.5,
+                    "wet": 0.3,
+                    "dry": 0.7
+                }
+            }
+        ]
+    }
+}

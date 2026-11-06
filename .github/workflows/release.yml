@@ -1,0 +1,42 @@
+name: release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write   # the release, and release.json on main
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Host tests
+        run: ./scripts/test.sh
+      - name: Check the tag matches module.json
+        run: |
+          V="$(python3 -c 'import json;print(json.load(open("src/module.json"))["version"])')"
+          [ "v$V" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME != module.json $V"; exit 1; }
+      - name: Build
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q gcc-aarch64-linux-gnu libc6-dev-arm64-cross
+          ./scripts/build.sh
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/choralroot-module.tar.gz
+      - name: Update release.json on main (what Schwung Manager reads)
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          git fetch origin main
+          git checkout -f main
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          cat > release.json << EOF2
+          {
+            "version": "${VERSION}",
+            "download_url": "https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/choralroot-module.tar.gz"
+          }
+          EOF2
+          sed -i 's/^          //' release.json
+          git add release.json
+          git commit -m "chore: release.json for ${GITHUB_REF_NAME}" || echo "release.json unchanged"
+          git push origin main
