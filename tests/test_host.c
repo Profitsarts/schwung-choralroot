@@ -21,6 +21,20 @@ static void count(uint8_t o[][3], int n, int verbose, const char *tag)
         if (verbose) printf("  %s %02X %3d %3d\n", tag, o[i][0], o[i][1], o[i][2]);
     }
 }
+/* a stand-in for the shim's external ring: takes at most xcap packets per audio block, like a full ring */
+static int xcap = 1000, xtaken, xons, xoffs, xbadcable, xrefused;
+static int send_ext(const uint8_t *m, int len)
+{
+    int t;
+    if (len != 4) return 0;
+    if (xtaken >= xcap) { xrefused++; return 0; }
+    xtaken++;
+    if ((m[0] >> 4) != 2 || (m[0] & 0x0F) != (m[1] >> 4)) xbadcable++;
+    t = m[1] & 0xF0;
+    if (t == 0x90 && m[3]) xons++;
+    else if (t == 0x80 || t == 0x90) xoffs++;
+    return 4;
+}
 #define CHECK(c, ...) do { if (!(c)) { fails++; printf("FAIL: " __VA_ARGS__); printf("\n"); } else printf("ok: " __VA_ARGS__), printf("\n"); } while (0)
 
 int main(void)
@@ -93,6 +107,37 @@ int main(void)
     uint8_t pb[3] = {0xE0, 0, 64};
     n = api->process_midi(fx, pb, 3, o, l, 16);
     CHECK(n == 1 && o[0][0] == 0xE0, "pitch bend passes through");
+
+    /* 6. USB out: Copy sends the same notes to the slot and to USB, Only sends them to USB alone, and a
+     *    refusing host ring delays packets instead of losing them (a lost note-off would hang in Live) */
+    h.midi_send_external = send_ext;
+    api->set_param(fx, "perform", "Off"); api->set_param(fx, "bass", "Off");
+    api->set_param(fx, "usb_out", "Copy");
+    api->get_param(fx, "usb_out", buf, sizeof buf); CHECK(!strcmp(buf, "Copy"), "usb_out = %s", buf);
+    for (i = 0; i < 10; i++) { xtaken = 0; n = api->tick(fx, 128, 44100, o, l, 16); count(o, n, 0, ""); }
+    ons = offs = xons = xoffs = 0;
+    xtaken = 0;
+    api->process_midi(fx, mod_on, 3, o, l, 16);
+    n = api->process_midi(fx, r_on, 3, o, l, 16); count(o, n, 0, "");
+    CHECK(ons >= 3 && xons == ons, "Copy: chord to slot (%d) and to USB (%d)", ons, xons);
+    n = api->process_midi(fx, r_off, 3, o, l, 16); count(o, n, 0, "");
+    api->process_midi(fx, mod_off, 3, o, l, 16);
+    CHECK(xoffs == offs && xons == xoffs, "Copy: USB offs match (%d / %d)", xons, xoffs);
+
+    api->set_param(fx, "usb_out", "2");
+    api->get_param(fx, "usb_out", buf, sizeof buf); CHECK(!strcmp(buf, "Only"), "usb_out index 2 = %s", buf);
+    for (i = 0; i < 10; i++) { xtaken = 0; n = api->tick(fx, 128, 44100, o, l, 16); count(o, n, 0, ""); }
+    ons = offs = xons = xoffs = xrefused = 0;
+    xcap = 1; xtaken = 0;                          /* the host ring takes one packet per block */
+    api->process_midi(fx, mod_on, 3, o, l, 16);
+    n = api->process_midi(fx, r_on, 3, o, l, 16); count(o, n, 0, "");
+    CHECK(ons == 0, "Only: nothing to the slot (%d)", ons);
+    api->process_midi(fx, r_off, 3, o, l, 16); api->process_midi(fx, mod_off, 3, o, l, 16);
+    CHECK(xrefused > 0, "the full ring refused packets (%d)", xrefused);
+    for (i = 0; i < 50; i++) { xtaken = 0; n = api->tick(fx, 128, 44100, o, l, 16); count(o, n, 0, ""); }
+    CHECK(xons >= 3 && xons == xoffs, "Only: every USB on got its off after retries (%d / %d)", xons, xoffs);
+    CHECK(xbadcable == 0, "every USB packet is cable 2 with the right CIN");
+
     printf("max burst %d (limit %d)\n", maxburst, MIDI_FX_MAX_OUT_MSGS);
     CHECK(maxburst <= MIDI_FX_MAX_OUT_MSGS, "never more than %d per call", MIDI_FX_MAX_OUT_MSGS);
     api->destroy_instance(fx); api->destroy_instance(fx2);

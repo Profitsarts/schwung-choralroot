@@ -2,7 +2,7 @@
   "id": "choralroot",
   "name": "ChoralRoot",
   "abbrev": "CROOT",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "ChoralRoot FM-1's chord engine as a MIDI FX: one hand plays roots, eight notes shape the chord (dim min maj sus / 6 m7 M7 9), with voicing, Key Mode, bass and strum / slop / arp / pattern / harp",
   "author": "Luis (port); ChoralRoot engine by Quixotic7",
   "dsp": "dsp.so",
@@ -53,7 +53,8 @@
             {"key": "raw", "short_name": "Raw", "name": "Raw Chord Stream", "type": "enum", "options": ["Off", "On"], "default": 0},
             {"key": "ch_raw", "short_name": "RawCh", "name": "Raw Channel (0 = same)", "type": "int", "min": 0, "max": 16, "default": 0, "step": 1},
             {"key": "sync_bpm", "short_name": "Sync", "name": "Follow Move Tempo", "type": "enum", "options": ["Off", "On"], "default": 1},
-            {"key": "bpm", "short_name": "BPM", "name": "Tempo (Sync off)", "type": "int", "min": 20, "max": 300, "default": 120, "step": 1}
+            {"key": "bpm", "short_name": "BPM", "name": "Tempo (Sync off)", "type": "int", "min": 20, "max": 300, "default": 120, "step": 1},
+            {"key": "usb_out", "short_name": "USB", "name": "USB MIDI Out (to Live)", "type": "enum", "options": ["Off", "Copy", "Only"], "default": 0}
           ],
           "knobs": ["mod_low", "mod_map", "bass_oct", "ch_bass", "raw", "ch_raw", "sync_bpm", "bpm"]
         }
