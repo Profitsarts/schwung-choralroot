@@ -28,5 +28,6 @@ echo "==> packaging dist/"
 rm -rf dist && mkdir -p "dist/$ID"
 mv dsp.so "dist/$ID/dsp.so"
 cp src/module.json LICENSE "dist/$ID/"
+mkdir -p "dist/$ID/chain_patches" && cp chain_patches/*.json "dist/$ID/chain_patches/"
 ( cd dist && tar -czf "$ID-module.tar.gz" "$ID/" )
 echo "==> done: dist/$ID-module.tar.gz"
