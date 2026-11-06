@@ -1,0 +1,63 @@
+{
+  "id": "choralroot",
+  "name": "ChoralRoot",
+  "abbrev": "CROOT",
+  "version": "0.1.0",
+  "description": "ChoralRoot FM-1's chord engine as a MIDI FX: one hand plays roots, eight notes shape the chord (dim min maj sus / 6 m7 M7 9), with voicing, Key Mode, bass and strum / slop / arp / pattern / harp",
+  "author": "Luis (port); ChoralRoot engine by Quixotic7",
+  "dsp": "dsp.so",
+  "capabilities": {
+    "chainable": true,
+    "component_type": "midi_fx",
+    "midi_in": true,
+    "midi_out": true,
+    "ui_hierarchy": {
+      "levels": {
+        "root": {
+          "name": "ChoralRoot",
+          "params": [
+            {"key": "voicing", "short_name": "Voice", "name": "Voicing", "type": "int", "min": -12, "max": 12, "default": 0, "step": 1},
+            {"key": "perform", "short_name": "Perf", "name": "Perform", "type": "enum", "options": ["Off", "Strum", "Slop", "Arp", "Pattern", "Harp"], "default": 0},
+            {"key": "key", "short_name": "Key", "name": "Key", "type": "enum", "options": ["Off", "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"], "default": 0},
+            {"key": "scale", "short_name": "Scale", "name": "Scale", "type": "enum", "options": ["Major", "Minor"], "default": 0},
+            {"key": "playstyle", "short_name": "Style", "name": "Play Style", "type": "enum", "options": ["Simple", "Advanced", "Free"], "default": 0},
+            {"key": "bass", "short_name": "Bass", "name": "Bass", "type": "enum", "options": ["Off", "Chords", "Unison", "Single", "Solo"], "default": 0},
+            {"key": "sticky", "short_name": "Hold", "name": "Sticky", "type": "enum", "options": ["Off", "On"], "default": 0},
+            {"key": "transpose", "short_name": "Trans", "name": "Transpose", "type": "int", "min": -24, "max": 24, "default": 0, "step": 1},
+            {"level": "perform", "label": "Perform"},
+            {"level": "setup", "label": "Setup"}
+          ],
+          "knobs": ["voicing", "perform", "key", "scale", "playstyle", "bass", "sticky", "transpose"]
+        },
+        "perform": {
+          "name": "Perform",
+          "params": [
+            {"key": "rate", "short_name": "Rate", "name": "Rate (ms)", "type": "int", "min": 1, "max": 1000, "default": 40, "step": 1},
+            {"key": "div", "short_name": "Div", "name": "Division", "type": "enum", "options": ["2/1", "1/1", "1/2", "1/2T", "1/4", "1/4T", "1/8", "1/8T", "1/16", "1/16T", "1/32", "1/32T"], "default": 6},
+            {"key": "dir", "short_name": "Dir", "name": "Direction", "type": "enum", "options": ["Up", "Down", "UpDown", "DownUp", "Played", "Random"], "default": 0},
+            {"key": "range", "short_name": "Range", "name": "Range (oct)", "type": "int", "min": 1, "max": 4, "default": 1, "step": 1},
+            {"key": "gate", "short_name": "Gate", "name": "Gate %", "type": "int", "min": 1, "max": 200, "default": 100, "step": 1},
+            {"key": "swing", "short_name": "Swing", "name": "Swing %", "type": "int", "min": 50, "max": 90, "default": 50, "step": 1},
+            {"key": "pattern", "short_name": "Patt", "name": "Pattern", "type": "int", "min": 1, "max": 12, "default": 1, "step": 1},
+            {"key": "amount", "short_name": "Slop", "name": "Slop Amount", "type": "int", "min": 0, "max": 100, "default": 0, "step": 1}
+          ],
+          "knobs": ["rate", "div", "dir", "range", "gate", "swing", "pattern", "amount"]
+        },
+        "setup": {
+          "name": "Setup",
+          "params": [
+            {"key": "mod_low", "short_name": "Chord", "name": "Chord Zone Low Note", "type": "int", "min": 0, "max": 120, "default": 48, "step": 1},
+            {"key": "mod_map", "short_name": "Map", "name": "Chord Zone Map", "type": "enum", "options": ["Semitones", "White keys"], "default": 0},
+            {"key": "bass_oct", "short_name": "BsOct", "name": "Bass Octave", "type": "int", "min": -2, "max": 4, "default": 0, "step": 1},
+            {"key": "ch_bass", "short_name": "BsCh", "name": "Bass Channel (0 = same)", "type": "int", "min": 0, "max": 16, "default": 0, "step": 1},
+            {"key": "raw", "short_name": "Raw", "name": "Raw Chord Stream", "type": "enum", "options": ["Off", "On"], "default": 0},
+            {"key": "ch_raw", "short_name": "RawCh", "name": "Raw Channel (0 = same)", "type": "int", "min": 0, "max": 16, "default": 0, "step": 1},
+            {"key": "sync_bpm", "short_name": "Sync", "name": "Follow Move Tempo", "type": "enum", "options": ["Off", "On"], "default": 1},
+            {"key": "bpm", "short_name": "BPM", "name": "Tempo (Sync off)", "type": "int", "min": 20, "max": 300, "default": 120, "step": 1}
+          ],
+          "knobs": ["mod_low", "mod_map", "bass_oct", "ch_bass", "raw", "ch_raw", "sync_bpm", "bpm"]
+        }
+      }
+    }
+  }
+}
