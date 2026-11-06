@@ -6,7 +6,7 @@ permissions:
   contents: write   # the release, and release.json on main
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm   # native aarch64 = Move's CPU: no cross toolchain, no apt
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -18,10 +18,8 @@ jobs:
           [ "v$V" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME != module.json $V"; exit 1; }
       - name: Build
         run: |
-          APT='-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o DPkg::Lock::Timeout=120'
-          timeout 600 sudo apt-get $APT update -q
-          timeout 600 sudo apt-get $APT install -y -q --no-install-recommends gcc-aarch64-linux-gnu libc6-dev-arm64-cross
           ./scripts/build.sh
+          file dist/choralroot/dsp.so | grep -q 'ARM aarch64'
       - name: Release
         uses: softprops/action-gh-release@v2
         with:

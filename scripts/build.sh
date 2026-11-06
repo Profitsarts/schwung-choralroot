@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
 #
 # Cross-compiles the MIDI FX for the Move (aarch64) and packages dist/.
-# Uses a local aarch64-linux-gnu-gcc when there is one, else the Docker image in scripts/Dockerfile.
+# Uses a local aarch64-linux-gnu-gcc when there is one, the native cc on an aarch64 machine (CI runs on
+# GitHub's arm64 runners, so it needs no apt), else the Docker image in scripts/Dockerfile.
 # The tarball's top-level directory MUST be the module id: Schwung extracts it straight into
 # modules/midi_fx/.
 set -euo pipefail
@@ -17,6 +18,10 @@ if command -v aarch64-linux-gnu-gcc >/dev/null 2>&1; then
     echo "==> compiling with local aarch64-linux-gnu-gcc"
     # shellcheck disable=SC2086
     aarch64-linux-gnu-gcc $FLAGS $SRCS -o dsp.so
+elif [ "$(uname -m)" = aarch64 ] && command -v cc >/dev/null 2>&1; then
+    echo "==> compiling with the native cc (aarch64 host)"
+    # shellcheck disable=SC2086
+    cc $FLAGS $SRCS -o dsp.so
 else
     docker build -q -t "$IMAGE" -f scripts/Dockerfile scripts/ >/dev/null
     echo "==> compiling with aarch64-linux-gnu-gcc (Docker)"
