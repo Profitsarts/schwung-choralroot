@@ -36,3 +36,10 @@ cp src/module.json LICENSE "dist/$ID/"
 mkdir -p "dist/$ID/chain_patches" && cp chain_patches/*.json "dist/$ID/chain_patches/"
 ( cd dist && tar -czf "$ID-module.tar.gz" "$ID/" )
 echo "==> done: dist/$ID-module.tar.gz"
+
+# ChoralRoot Pads: a JS tool, no compiling. Same top-level-directory rule (modules/tools/choralroot-pads/).
+PADS=choralroot-pads
+mkdir -p "dist/$PADS"
+cp pads/module.json pads/ui.js pads/logic.mjs LICENSE "dist/$PADS/"
+( cd dist && tar -czf "$PADS-module.tar.gz" "$PADS/" )
+echo "==> done: dist/$PADS-module.tar.gz"

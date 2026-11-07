@@ -7,3 +7,9 @@ mkdir -p build
 cc -std=c11 -O2 -Wall -Wextra -Werror -Isrc -Ivendor/choralroot \
     src/dsp/choralroot_fx.c vendor/choralroot/cr_engine.c tests/test_host.c -o build/test_host
 build/test_host
+if command -v node >/dev/null 2>&1; then
+    node tests/pads_logic.test.mjs
+    node tests/pads_ui.test.mjs
+else
+    echo "(node not found: skipping the ChoralRoot Pads tests)"
+fi

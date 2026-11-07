@@ -14,8 +14,10 @@ jobs:
         run: ./scripts/test.sh
       - name: Check the tag matches module.json
         run: |
-          V="$(python3 -c 'import json;print(json.load(open("src/module.json"))["version"])')"
-          [ "v$V" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME != module.json $V"; exit 1; }
+          for M in src/module.json pads/module.json; do
+            V="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["version"])' "$M")"
+            [ "v$V" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME != $M $V"; exit 1; }
+          done
       - name: Build
         run: |
           ./scripts/build.sh
@@ -23,7 +25,9 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/choralroot-module.tar.gz
+          files: |
+            dist/choralroot-module.tar.gz
+            dist/choralroot-pads-module.tar.gz
       - name: Update release.json on main (what Schwung Manager reads)
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
@@ -34,7 +38,17 @@ jobs:
           cat > release.json << EOF2
           {
             "version": "${VERSION}",
-            "download_url": "https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/choralroot-module.tar.gz"
+            "download_url": "https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/choralroot-module.tar.gz",
+            "modules": {
+              "choralroot": {
+                "version": "${VERSION}",
+                "download_url": "https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/choralroot-module.tar.gz"
+              },
+              "choralroot-pads": {
+                "version": "${VERSION}",
+                "download_url": "https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/choralroot-pads-module.tar.gz"
+              }
+            }
           }
           EOF2
           sed -i 's/^          //' release.json
