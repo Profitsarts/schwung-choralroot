@@ -70,10 +70,20 @@ Si no pulsas ningún pad de acorde, cada nota da el acorde de la escala (Key Mod
 
 - **Pantalla:** el acorde en el centro (nombre de ChoralRoot), tonalidad, modo y octava.
 - **Arriba / Abajo:** octava.
-- **Clic del jog:** Setup, con **Slot** (1-4), **Key**, **Scale** y **Chord Behaviour**. *Momentary*
+- **Clic del jog:** Setup, con **Slot** (1-4), **Key**, **Scale**, **Chord Behaviour** y **Send To**. *Momentary*
   suena mientras mantienes el pad; *Hold* fija el pad con un toque y lo suelta con otro.
   Gira el jog para moverte, haz clic para editar y pulsa Back para cerrar.
 - **Back:** sale del tool. Suelta todas las notas y deja ChoralRoot como estaba.
+
+**Send To** decide por dónde van las notas:
+
+| Send To | Camino | Grabar |
+| --- | --- | --- |
+| **Move** (por defecto) | Entran en el Move como MIDI externo, por el canal del slot. La pista del Move en ese canal las toca y, con su MIDI Out, las pasa al ChoralRoot del slot. | En el **secuenciador del Move**. El clip guarda las teclas de acorde (notas 0-7) y las raíces, y al reproducirlo ChoralRoot rehace los acordes. |
+| **Live** | Van directas al slot de Schwung. El Move no las ve. | En **Live**, con USB MIDI Out = Copy u Only en ChoralRoot. |
+
+Para **Move**, la pista tiene que recibir MIDI externo en el canal del slot y sacar su MIDI Out por
+ese mismo canal (la configuración de 4 pistas con canales 1-4).
 
 El slot elegido tiene que llevar ChoralRoot como MIDI FX. Mientras el tool está abierto, mueve la
 zona de acordes de ChoralRoot a las notas 0-7 y le pone la misma tonalidad. Al salir lo restaura.
@@ -106,7 +116,7 @@ Están en `chain_patches/`, y también dentro del tarball, en `choralroot/chain_
 
 **Cómo cargarlos:** en la Shadow UI, entra en un slot y abre el navegador de patches. Gira el jog para elegir y púlsalo para cargar.
 
-## Limitaciones conocidas (v0.3)
+## Limitaciones conocidas (v0.3.1)
 
 - En los layouts isomórficos de Move (4as) la misma nota aparece en varios pads, así que la zona de acordes
   también suena en otros pads. Funciona mejor con un teclado externo o con un layout donde las notas no se

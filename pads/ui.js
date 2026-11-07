@@ -8,7 +8,14 @@
 // Controls
 //   pads          column 1-2: chord type, columns 3-8: roots in the scale
 //   Up / Down     octave
-//   jog click     open / close Setup (Slot, Key, Scale, Chord Behaviour); turn the jog to move, click to edit
+//   jog click     open / close Setup (Slot, Key, Scale, Chord Behaviour, Send To); turn the jog to move, click to edit
+//
+// Send To
+//   Move  the notes go into Move as external MIDI on the slot's channel (cable 2), so the Move track on
+//         that channel plays them, can record them in a clip, and its MIDI Out feeds the slot's ChoralRoot.
+//         A clip keeps the chord keys (notes 0..7) and the roots, so playing it back rebuilds the chords.
+//   Live  the notes go straight to the slot (shadow_send_midi_to_dsp). Move's sequencer never sees them;
+//         record the chords in Live with ChoralRoot's USB MIDI Out.
 //   Back          close Setup, or leave the tool (everything is released, the slot is put back as it was)
 
 import {
@@ -19,7 +26,7 @@ import {
 const SETTINGS_PATH = '/data/UserData/schwung/modules/tools/choralroot-pads/settings.json';
 const CC_JOG = 14, CC_JOG_CLICK = 3, CC_BACK = 51, CC_UP = 55, CC_DOWN = 54;
 
-let cfg = { slot: 0, key: 0, scale: 'Major', behaviour: 'Momentary', octave: 0 };
+let cfg = { slot: 0, key: 0, scale: 'Major', behaviour: 'Momentary', octave: 0, sendTo: 'Move' };
 const chord = { held: new Set() };
 const pressed = new Set();          // note pads down
 const sounding = new Map();         // pad -> root note sent (so its off matches its on)
@@ -31,7 +38,11 @@ let setupOpen = false, setupRow = 0, setupEdit = false, needPaint = true;
 const has = (f) => typeof globalThis[f] === 'function';
 function getP(slot, key) { try { return has('shadow_get_param') ? shadow_get_param(slot, key) : null; } catch (e) { return null; } }
 function setP(slot, key, v) { try { if (has('shadow_set_param')) shadow_set_param(slot, key, String(v)); } catch (e) {} }
-function send(st, d1, d2) { if (has('shadow_send_midi_to_dsp')) shadow_send_midi_to_dsp([st, d1 & 127, d2 & 127]); }
+function send(st, d1, d2) {
+  if (cfg.sendTo === 'Move') {
+    if (has('move_midi_inject_to_move')) move_midi_inject_to_move([0x20 | (st >> 4), st, d1 & 127, d2 & 127]);
+  } else if (has('shadow_send_midi_to_dsp')) shadow_send_midi_to_dsp([st, d1 & 127, d2 & 127]);
+}
 function led(n, c) { if (has('move_midi_internal_send')) move_midi_internal_send([0x09, 0x90, n, c]); }
 
 function loadCfg() {
@@ -41,6 +52,7 @@ function loadCfg() {
   } catch (e) {}
   if (!SCALES[cfg.scale]) cfg.scale = 'Major';
   if (!BEHAVIOURS.includes(cfg.behaviour)) cfg.behaviour = 'Momentary';
+  if (cfg.sendTo !== 'Live') cfg.sendTo = 'Move';
 }
 function saveCfg() { try { if (has('host_write_file')) host_write_file(SETTINGS_PATH, JSON.stringify(cfg)); } catch (e) {} }
 
@@ -133,17 +145,17 @@ function big(text, y, s) {
     x += 6 * s;
   }
 }
-const SETUP = ['Slot', 'Key', 'Scale', 'Chord Behaviour'];
+const SETUP = ['Slot', 'Key', 'Scale', 'Chord Behaviour', 'Send To'];
 function setupValue(i) {
-  return [String(cfg.slot + 1), NOTE_NAMES[cfg.key], cfg.scale, cfg.behaviour][i];
+  return [String(cfg.slot + 1), NOTE_NAMES[cfg.key], cfg.scale, cfg.behaviour, cfg.sendTo][i];
 }
 function draw() {
   clear_screen();
   if (setupOpen) {
     print(2, 2, 'SETUP', 1);
     SETUP.forEach((label, i) => {
-      const y = 16 + i * 11, on = i === setupRow;
-      if (on) fill_rect(0, y - 2, 128, 11, 1);
+      const y = 13 + i * 10, on = i === setupRow;
+      if (on) fill_rect(0, y - 1, 128, 10, 1);
       print(4, y, label, on ? 0 : 1);
       const v = (on && setupEdit ? '< ' + setupValue(i) + ' >' : setupValue(i));
       print(124 - text_width(v), y, v, on ? 0 : 1);
@@ -152,7 +164,7 @@ function draw() {
   }
   const top = 'S' + (cfg.slot + 1) + ' ' + NOTE_NAMES[cfg.key] + ' ' + (cfg.scale === 'Major' ? 'MAJ' : 'MIN');
   print(2, 2, top, 1);
-  const bh = cfg.behaviour === 'Hold' ? 'HOLD' : 'MOM';
+  const bh = (cfg.sendTo === 'Move' ? 'MOVE ' : 'LIVE ') + (cfg.behaviour === 'Hold' ? 'HOLD' : 'MOM');
   print(126 - text_width(bh), 2, bh, 1);
   if (!fx) {
     print(4, 24, 'No ChoralRoot in slot ' + (cfg.slot + 1), 1);
@@ -173,6 +185,7 @@ function editSetup(i, d) {
   if (i === 1) { releaseAll(); cfg.key = (cfg.key + d + 12) % 12; syncKey(); }
   if (i === 2) { releaseAll(); cfg.scale = cfg.scale === 'Major' ? 'Minor' : 'Major'; syncKey(); }
   if (i === 3) { releaseAll(); cfg.behaviour = cfg.behaviour === 'Hold' ? 'Momentary' : 'Hold'; }
+  if (i === 4) { releaseAll(); cfg.sendTo = cfg.sendTo === 'Move' ? 'Live' : 'Move'; }
   saveCfg(); needPaint = true;
 }
 function leave() {
