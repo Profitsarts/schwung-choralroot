@@ -55,6 +55,29 @@ En Live, en una pista MIDI: *MIDI From* = Move Standalone Port, monitor In o Aut
   usa canales distintos para cada dirección.
 - Al cambiar USB MIDI Out se sueltan todas las notas, para que no se quede ninguna colgada.
 
+## ChoralRoot Pads (tool estilo Orchid)
+
+Un segundo módulo, de tipo **Tool**: convierte los 32 pads del Move en una superficie estilo Orchid
+para tocar el ChoralRoot de un slot. Ábrelo desde el menú Tools de la Shadow UI.
+
+| Pads | Qué hacen |
+| --- | --- |
+| Columna 1, de arriba abajo | MIN, MAJ, SUS, DIM: el tipo de tríada |
+| Columna 2, de arriba abajo | 6, 7, maj7, 9: añaden una nota encima y se combinan con la columna 1 |
+| Columnas 3 a 8 | 24 notas de la escala, de abajo a la izquierda hacia arriba, sin repetir |
+
+Si no pulsas ningún pad de acorde, cada nota da el acorde de la escala (Key Mode).
+
+- **Pantalla:** el acorde en el centro (nombre de ChoralRoot), tonalidad, modo y octava.
+- **Arriba / Abajo:** octava.
+- **Clic del jog:** Setup, con **Slot** (1-4), **Key**, **Scale** y **Chord Behaviour**. *Momentary*
+  suena mientras mantienes el pad; *Hold* fija el pad con un toque y lo suelta con otro.
+  Gira el jog para moverte, haz clic para editar y pulsa Back para cerrar.
+- **Back:** sale del tool. Suelta todas las notas y deja ChoralRoot como estaba.
+
+El slot elegido tiene que llevar ChoralRoot como MIDI FX. Mientras el tool está abierto, mueve la
+zona de acordes de ChoralRoot a las notas 0-7 y le pone la misma tonalidad. Al salir lo restaura.
+
 ## Compilar y probar
 
 ```sh
@@ -83,13 +106,13 @@ Están en `chain_patches/`, y también dentro del tarball, en `choralroot/chain_
 
 **Cómo cargarlos:** en la Shadow UI, entra en un slot y abre el navegador de patches. Gira el jog para elegir y púlsalo para cargar.
 
-## Limitaciones conocidas (v0.2)
+## Limitaciones conocidas (v0.3)
 
 - En los layouts isomórficos de Move (4as) la misma nota aparece en varios pads, así que la zona de acordes
   también suena en otros pads. Funciona mejor con un teclado externo o con un layout donde las notas no se
-  repitan. Una superficie de pads propia es la fase 2.
+  repitan, o con ChoralRoot Pads.
 - No hay pantalla propia todavía: solo las páginas de knobs.
-- USB MIDI Out está probado en el host, no todavía en un Move real.
+- ChoralRoot Pads está probado con un host simulado, no todavía en un Move real.
 - Los chord pads y el looper de ChoralRoot no están portados.
 
 ## Licencia
