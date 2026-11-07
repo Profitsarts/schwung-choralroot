@@ -15,11 +15,12 @@ writeFileSync(join(dir, 'ui.mjs'), readFileSync(join(here, 'ui.js'), 'utf8')
 // fake host: slot 0 has ChoralRoot as MIDI FX 1, receive channel 1
 const params = { '0:midi_fx1_module': 'choralroot', '0:slot:receive_channel': '1', '0:midi_fx1:mod_low': '48',
   '0:midi_fx1:mod_map': 'Semitones', '0:midi_fx1:key': 'Off', '0:midi_fx1:scale': 'Major' };
-const sent = [], leds = {}; let blocked = null, exited = false, files = {};
+const sent = [], injected = [], leds = {}; let blocked = null, exited = false, files = {};
 Object.assign(globalThis, {
   shadow_get_param: (s, k) => params[s + ':' + k] ?? null,
   shadow_set_param: (s, k, v) => { params[s + ':' + k] = v; return true; },
   shadow_send_midi_to_dsp: (m) => { sent.push(m); return true; },
+  move_midi_inject_to_move: (p) => { injected.push(p); sent.push(p.slice(1)); return true; },
   move_midi_internal_send: (m) => { leds[m[2]] = m[3]; },
   host_pad_block: (b) => { blocked = b; },
   host_exit_module: () => { exited = true; },
@@ -38,15 +39,24 @@ ok(params['0:midi_fx1:mod_low'] === '0', 'ChoralRoot chord zone moved to 0..7');
 ok(params['0:midi_fx1:key'] === 'C', 'ChoralRoot key set to the pads key');
 ok(leds[92] !== undefined && leds[99] !== undefined, 'all pads painted');
 
+// Send To = Move (the default): notes go into Move as cable-2 external MIDI on the slot's channel
+sent.length = 0;
+pad(92, true); pad(70, true); pad(70, false); pad(92, false);
+ok(JSON.stringify(injected) === JSON.stringify([[0x29, 0x90, 1, 100], [0x29, 0x90, 48, 100], [0x28, 0x80, 48, 0], [0x28, 0x80, 1, 0]]),
+  'Send To Move: cable-2 packets into Move, MIN zone + C3, channel 1');
+
+// Send To = Live: straight to the slot
+cc(3, 127); for (let i = 0; i < 4; i++) cc(14, 1); cc(3, 127); cc(14, 1); cc(3, 127); cc(51, 127);
+injected.length = 0;
 // Momentary: MIN down, root C3 (pad 70), up
 sent.length = 0;
 pad(92, true); pad(70, true); pad(70, false); pad(92, false);
-ok(JSON.stringify(sent) === JSON.stringify([[0x90, 1, 100], [0x90, 48, 100], [0x80, 48, 0], [0x80, 1, 0]]),
-  'momentary: zone MIN on, C3 on, C3 off, zone MIN off, channel 1');
+ok(JSON.stringify(sent) === JSON.stringify([[0x90, 1, 100], [0x90, 48, 100], [0x80, 48, 0], [0x80, 1, 0]]) && injected.length === 0,
+  'Send To Live, momentary: zone MIN on, C3 on, C3 off, zone MIN off, channel 1, nothing into Move');
 
 // Hold: Setup -> Chord Behaviour -> Hold
 cc(3, 127);                                  // open setup
-cc(14, 1); cc(14, 1); cc(14, 1);              // row 3 = Chord Behaviour
+cc(14, 127);                                  // the cursor is still on Send To (row 4): one step up to Chord Behaviour
 cc(3, 127); cc(14, 1); cc(3, 127); cc(51, 127); // edit, toggle, stop editing, close
 sent.length = 0;
 pad(92, true); pad(92, false);
