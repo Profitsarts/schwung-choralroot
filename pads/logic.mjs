@@ -5,7 +5,7 @@
 // Layout A, as approved on the mockup. Pads are notes 68..99, bottom-left to top-right, 4 rows of 8.
 //   column 1, top to bottom: MIN  MAJ  SUS  DIM      (the triad)
 //   column 2, top to bottom: 6    7    maj7 9        (a note on top; they combine with column 1)
-//   columns 3..8: 24 scale notes, rising from bottom-left row by row, no repeats.
+//   columns 3..8: 24 scale notes (Chromatic: two octaves of semitones), rising from bottom-left row by row, no repeats.
 //
 // The pads do not run a chord engine of their own. They play the ChoralRoot MIDI FX in a Schwung slot:
 // a chord pad sends that slot's chord-zone note, a note pad sends a root. ZONE_LOW moves the chord
@@ -25,7 +25,10 @@ const CHORD_GRID = [
 export const CHORD_ORDER = ['MIN', 'MAJ', 'SUS', 'DIM', '6', '7', 'maj7', '9'];
 
 export const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-export const SCALES = { Major: [0, 2, 4, 5, 7, 9, 11], Minor: [0, 2, 3, 5, 7, 8, 10] };
+export const SCALES = { Major: [0, 2, 4, 5, 7, 9, 11], Minor: [0, 2, 3, 5, 7, 8, 10],
+  Chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] };
+export const SCALE_ORDER = ['Major', 'Minor', 'Chromatic'];
+export const SCALE_SHORT = { Major: 'MAJ', Minor: 'MIN', Chromatic: 'CHR' };
 export const BEHAVIOURS = ['Momentary', 'Hold'];
 
 export function isPad(n) { return n >= PAD_LO && n <= PAD_HI; }
@@ -46,7 +49,7 @@ export function padRole(n) {
 /** the root a note pad plays. key 0..11, octave shift -2..+2; index 0 is the key's root in octave 3 (C3 = 48) */
 export function rootNote(index, key, scale, octave) {
   const sc = SCALES[scale] || SCALES.Major;
-  const n = 48 + 12 * octave + key + 12 * Math.floor(index / 7) + sc[index % 7];
+  const n = 48 + 12 * octave + key + 12 * Math.floor(index / sc.length) + sc[index % sc.length];
   return n > 127 ? -1 : n < ZONE_LOW + 8 ? -1 : n;
 }
 
@@ -87,8 +90,8 @@ export function localChordName(root, held, key, scale) {
   const sc = SCALES[scale] || SCALES.Major;
   let name = '';
   const triad = ['MIN', 'MAJ', 'SUS', 'DIM'].some((t) => held.has(t));
-  if (!triad) {
-    // Key mode: the scale's own triad on that degree
+  if (!triad && sc.length === 7) {
+    // Key mode: the scale's own triad on that degree (Chromatic has no Key mode: ChoralRoot plays the root alone)
     const pc = ((root - key) % 12 + 12) % 12, deg = sc.indexOf(pc);
     if (deg >= 0) {
       const at = (k) => { const i = deg + k; return sc[i % 7] + 12 * Math.floor(i / 7) - sc[deg]; };
@@ -110,12 +113,12 @@ export function localChordName(root, held, key, scale) {
 
 /** LED colour index (Move palette) for each pad, given what is held and pressed */
 export const LED = { chordA: 3, chordB: 6, chordOn: 8, root: 120, scale: 15, hit: 5, off: 0 };
-export function padColour(n, held, pressed) {
+export function padColour(n, held, pressed, scale) {
   const r = padRole(n);
   if (r.kind === 'chord') {
     if (held.has(r.id)) return LED.chordOn;
     return padPos(n).col === 0 ? LED.chordA : LED.chordB;
   }
   if (pressed.has(n)) return LED.hit;
-  return r.index % 7 === 0 ? LED.root : LED.scale;
+  return r.index % (SCALES[scale] || SCALES.Major).length === 0 ? LED.root : LED.scale;
 }

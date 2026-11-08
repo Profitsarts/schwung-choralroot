@@ -20,11 +20,15 @@
 
 import {
   isPad, padRole, rootNote, chordPress, chordReleaseAll, pendingLabel, localChordName, padColour,
-  NOTE_NAMES, SCALES, BEHAVIOURS, ZONE_LOW,
+  NOTE_NAMES, SCALES, SCALE_ORDER, SCALE_SHORT, BEHAVIOURS, ZONE_LOW,
 } from '/data/UserData/schwung/modules/tools/choralroot-pads/logic.mjs';
 
 const SETTINGS_PATH = '/data/UserData/schwung/modules/tools/choralroot-pads/settings.json';
 const CC_JOG = 14, CC_JOG_CLICK = 3, CC_BACK = 51, CC_UP = 55, CC_DOWN = 54;
+// knobs (CC 71-78, relative): 1 Key, 2 Scale, 3 Send To, 4 Chord Behaviour, 8 Octave -> Setup row (-1 = octave)
+const KNOBS = { 71: { row: 1, step: 3 }, 72: { row: 2, step: 6 }, 73: { row: 4, step: 6 }, 74: { row: 3, step: 6 }, 78: { row: -1, step: 6 } };
+const knobAcc = {};
+let flash = '', flashLeft = 0;      // what a knob just changed, shown at the bottom for a moment
 
 let cfg = { slot: 0, key: 0, scale: 'Major', behaviour: 'Momentary', octave: 0, sendTo: 'Move' };
 const chord = { held: new Set() };
@@ -128,8 +132,9 @@ function checkZone() {
 }
 function syncKey() {
   if (!fx) return;
-  setP(cfg.slot, fx.comp + ':key', NOTE_NAMES[cfg.key]);
-  setP(cfg.slot, fx.comp + ':scale', cfg.scale);
+  // Chromatic: ChoralRoot's Key mode off, so a root with no chord pad plays alone (the chord pads decide)
+  setP(cfg.slot, fx.comp + ':key', cfg.scale === 'Chromatic' ? 'Off' : NOTE_NAMES[cfg.key]);
+  setP(cfg.slot, fx.comp + ':scale', cfg.scale === 'Chromatic' ? 'Major' : cfg.scale);
 }
 function detach() {
   releaseAll();
@@ -175,7 +180,7 @@ function onPad(n, down, vel) {
 }
 
 /* ---------------------------------------------------------------- LEDs --- */
-function paintPad(n) { led(n, padColour(n, chord.held, pressed)); }
+function paintPad(n) { led(n, padColour(n, chord.held, pressed, cfg.scale)); }
 function paintAll() { for (let n = 68; n <= 99; n++) paintPad(n); }
 
 /* -------------------------------------------------------------- screen --- */
@@ -223,7 +228,7 @@ function draw() {
     });
     return;
   }
-  const top = 'S' + (cfg.slot + 1) + ' ' + NOTE_NAMES[cfg.key] + ' ' + (cfg.scale === 'Major' ? 'MAJ' : 'MIN');
+  const top = 'S' + (cfg.slot + 1) + ' ' + NOTE_NAMES[cfg.key] + ' ' + SCALE_SHORT[cfg.scale];
   print(2, 2, top, 1);
   const bh = (cfg.sendTo === 'Move' ? 'MOVE ' : 'LIVE ') + (cfg.behaviour === 'Hold' ? 'HOLD' : 'MOM');
   print(126 - text_width(bh), 2, bh, 1);
@@ -236,9 +241,9 @@ function draw() {
   }
   const name = shownName || '--';
   big(name, 22, name.length > 9 ? 2 : 3 * 6 * name.length <= 126 ? 3 : 2);
-  print(2, 54, fx.zoneOk ? (notesLine || ' ') : fx.checks > 5 ? 'CHORD ZONE FAILED' : 'linking...', 1);
+  print(2, 54, flashLeft > 0 ? flash : fx.zoneOk ? (notesLine || ' ') : fx.checks > 5 ? 'CHORD ZONE FAILED' : 'linking...', 1);
   const oc = 'OCT ' + (cfg.octave > 0 ? '+' : '') + cfg.octave;
-  print(126 - text_width(oc), 54, oc, 1);
+  if (flashLeft <= 0) print(126 - text_width(oc), 54, oc, 1);
 }
 
 /* ------------------------------------------------------------ controls --- */
@@ -246,10 +251,14 @@ function delta(v) { return v >= 1 && v <= 63 ? 1 : v >= 65 && v <= 127 ? -1 : 0;
 function editSetup(i, d) {
   if (i === 0) { const s = (cfg.slot + d + 4) % 4; detach(); cfg.slot = s; userSlot = true; attach(false); }
   if (i === 1) { releaseAll(); cfg.key = (cfg.key + d + 12) % 12; syncKey(); }
-  if (i === 2) { releaseAll(); cfg.scale = cfg.scale === 'Major' ? 'Minor' : 'Major'; syncKey(); }
+  if (i === 2) { releaseAll(); cfg.scale = SCALE_ORDER[(SCALE_ORDER.indexOf(cfg.scale) + d + 3) % 3]; syncKey(); }
   if (i === 3) { releaseAll(); cfg.behaviour = cfg.behaviour === 'Hold' ? 'Momentary' : 'Hold'; }
   if (i === 4) { releaseAll(); cfg.sendTo = cfg.sendTo === 'Move' ? 'Live' : 'Move'; }
   saveCfg(); needPaint = true;
+}
+function shiftOctave(d) {
+  const o = Math.max(-2, Math.min(2, cfg.octave + d));
+  if (o !== cfg.octave) { cfg.octave = o; saveCfg(); dirty = true; }
 }
 function leave() {
   detach();
@@ -274,9 +283,15 @@ globalThis.onMidiMessageInternal = function (m) {
       if (setupEdit) editSetup(setupRow, d); else setupRow = (setupRow + d + SETUP.length) % SETUP.length;
       dirty = true; return;
     }
-    if ((d1 === CC_UP || d1 === CC_DOWN) && d2 > 0) {
-      const o = Math.max(-2, Math.min(2, cfg.octave + (d1 === CC_UP ? 1 : -1)));
-      if (o !== cfg.octave) { cfg.octave = o; saveCfg(); dirty = true; }
+    if ((d1 === CC_UP || d1 === CC_DOWN) && d2 > 0) { shiftOctave(d1 === CC_UP ? 1 : -1); return; }
+    if (KNOBS[d1] && !setupOpen) {
+      const k = KNOBS[d1], acc = (knobAcc[d1] || 0) + delta(d2);
+      if (Math.abs(acc) < k.step) { knobAcc[d1] = acc; return; }
+      knobAcc[d1] = 0;
+      const d = acc > 0 ? 1 : -1;
+      if (k.row < 0) shiftOctave(d); else editSetup(k.row, d);
+      flash = k.row < 0 ? 'OCT ' + (cfg.octave > 0 ? '+' : '') + cfg.octave : ['', 'KEY', 'SCALE', 'CHORD', 'SEND'][k.row] + ': ' + setupValue(k.row);
+      flashLeft = 45; dirty = true;
       return;
     }
     return;
@@ -296,6 +311,7 @@ globalThis.init = function () {
 globalThis.tick = function () {
   if (needPaint) { needPaint = false; paintAll(); }
   flushOneWrite();
+  if (flashLeft > 0 && --flashLeft === 0) dirty = true;
   if (!fx && !setupOpen && (++findTick % 40) === 0) { attach(!userSlot); if (fx) needPaint = true; }   // ChoralRoot added later
   if (fx && !fx.zoneOk && (++zoneTick % 4) === 0) checkZone();
   if (nameAsk > 0 && fx) {                              // ChoralRoot's own (Orchid) name, once it has played

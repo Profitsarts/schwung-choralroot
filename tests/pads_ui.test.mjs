@@ -72,4 +72,23 @@ ok(sent.some((m) => m[0] === 0x80 && m[1] === 50) && sent.some((m) => m[0] === 0
 ok(params['0:midi_fx1:mod_low'] === '48' && params['0:midi_fx1:key'] === 'Off', 'ChoralRoot settings restored');
 ok(blocked === false && exited, 'pads given back and tool exited');
 ok(JSON.parse(Object.values(files)[0]).behaviour === 'Hold', 'settings saved');
+// knobs (in a fresh session of the tool): knob 2 turns Scale to Chromatic and ChoralRoot's Key mode off,
+// knob 3 Send To, knob 8 octave; a small turn does nothing
+init(); tick();
+for (let i = 0; i < 3; i++) cc(72, 1);
+ok(params['0:midi_fx1:scale'] === 'Major' && params['0:midi_fx1:key'] === 'C', 'knob 2: a small turn changes nothing');
+for (let i = 0; i < 3; i++) cc(72, 1);                      // 6 steps in all: Major -> Minor
+for (let i = 0; i < 6; i++) cc(72, 1);
+ok(params['0:midi_fx1:key'] === 'Off' && params['0:midi_fx1:scale'] === 'Major', 'knob 2 to Chromatic: ChoralRoot key Off');
+const sent0 = sent.length; injected.length = 0;
+pad(70, true); pad(71, true); pad(70, false); pad(71, false);
+ok(sent.slice(sent0).filter((m) => (m[0] & 0xF0) === 0x90).map((m) => m[1]).join() === '48,49', 'Chromatic: pads 70, 71 are C3, C#3');
+const viaMove = injected.length > 0;
+for (let i = 0; i < 6; i++) cc(78, 1);
+for (let i = 0; i < 6; i++) cc(73, 127);
+sent.length = 0; injected.length = 0;
+pad(70, true); pad(70, false);
+ok((injected.length > 0) !== viaMove && sent[0][1] === 60, 'knob 3: Send To flipped; knob 8: octave +1 (C4)');
+cc(51, 127);
+
 console.log(`\nALL PASS (${n})`);

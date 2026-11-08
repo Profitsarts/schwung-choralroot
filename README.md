@@ -68,8 +68,13 @@ para tocar el ChoralRoot de un slot. Ábrelo desde el menú Tools de la Shadow U
 
 Si no pulsas ningún pad de acorde, cada nota da el acorde de la escala (Key Mode).
 
+**Scale = Chromatic:** los 24 pads de nota son dos octavas de semitonos, como un teclado. No hay Key Mode:
+sin pad de acorde suena la nota sola, y el tipo de acorde lo decides siempre con las dos columnas.
+
 - **Pantalla:** el acorde en el centro (nombre de ChoralRoot), tonalidad, modo y octava.
 - **Arriba / Abajo:** octava.
+- **Knobs:** 1 Key, 2 Scale (Major / Minor / Chromatic), 3 Send To, 4 Chord Behaviour, 8 octava. Abajo a la
+  izquierda se ve un momento lo que has cambiado.
 - **Clic del jog:** Setup, con **Slot** (1-4), **Key**, **Scale**, **Chord Behaviour** y **Send To**. *Momentary*
   suena mientras mantienes el pad; *Hold* fija el pad con un toque y lo suelta con otro.
   Gira el jog para moverte, haz clic para editar y pulsa Back para cerrar.
@@ -120,7 +125,7 @@ Están en `chain_patches/`, y también dentro del tarball, en `choralroot/chain_
 
 **Cómo cargarlos:** en la Shadow UI, entra en un slot y abre el navegador de patches. Gira el jog para elegir y púlsalo para cargar.
 
-## Limitaciones conocidas (v0.3.2)
+## Limitaciones conocidas (v0.3.3)
 
 - En los layouts isomórficos de Move (4as) la misma nota aparece en varios pads, así que la zona de acordes
   también suena en otros pads. Funciona mejor con un teclado externo o con un layout donde las notas no se
