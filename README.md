@@ -85,7 +85,7 @@ Si no pulsas ningún pad de acorde, cada nota da el acorde de la escala (Key Mod
 Para **Move**, la pista tiene que recibir MIDI externo en el canal del slot y sacar su MIDI Out por
 ese mismo canal (la configuración de 4 pistas con canales 1-4).
 
-El slot elegido tiene que llevar ChoralRoot como MIDI FX. Mientras el tool está abierto, mueve la
+ChoralRoot tiene que estar como MIDI FX en un slot (1-4). Al abrirse, el tool lo busca primero en el slot del Setup y luego en los demás, y se queda con el primero que lo tenga (arriba a la izquierda pone S1-S4). Si no lo encuentra, la pantalla dice qué MIDI FX tiene el slot, y en cuanto lo pongas lo detecta solo. Mientras el tool está abierto, mueve la
 zona de acordes de ChoralRoot a las notas 0-7 y le pone la misma tonalidad. Al salir lo restaura.
 
 Abajo a la izquierda pone **linking...** hasta que ChoralRoot confirma que su zona de acordes ya está en
@@ -120,7 +120,7 @@ Están en `chain_patches/`, y también dentro del tarball, en `choralroot/chain_
 
 **Cómo cargarlos:** en la Shadow UI, entra en un slot y abre el navegador de patches. Gira el jog para elegir y púlsalo para cargar.
 
-## Limitaciones conocidas (v0.3.1)
+## Limitaciones conocidas (v0.3.2)
 
 - En los layouts isomórficos de Move (4as) la misma nota aparece en varios pads, así que la zona de acordes
   también suena en otros pads. Funciona mejor con un teclado externo o con un layout donde las notas no se

@@ -2,7 +2,7 @@
   "id": "choralroot-pads",
   "name": "ChoralRoot Pads",
   "abbrev": "CRPAD",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Orchid-style surface for the ChoralRoot MIDI FX: two columns of chord-type pads (min maj sus dim / 6 7 maj7 9), 24 scale-note pads, chord name on screen, Momentary or Hold chord pads",
   "author": "Luis (port); ChoralRoot engine by Quixotic7",
   "license": "GPL-3.0-only",

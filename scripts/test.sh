@@ -14,6 +14,7 @@ cc -std=c11 -O2 -Wall -Wextra -Werror -Isrc -Ivendor/choralroot \
 if command -v node >/dev/null 2>&1; then
     node tests/pads_logic.test.mjs
     node tests/pads_ui.test.mjs
+    node tests/pads_find.test.mjs
     node tests/pads_e2e.test.mjs build/fx_cli
 else
     echo "(node not found: skipping the ChoralRoot Pads tests)"

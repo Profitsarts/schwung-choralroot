@@ -31,7 +31,7 @@ const chord = { held: new Set() };
 const pressed = new Set();          // note pads down
 const sounding = new Map();         // pad -> root note sent (so its off matches its on)
 let fx = null;                      // { comp: 'midi_fx1', ch: 0..15, saved: {mod_low, mod_map, key, scale} }
-let shownName = '', notesLine = '', dirty = true, nameAsk = 0, zoneTick = 0;
+let shownName = '', notesLine = '', dirty = true, nameAsk = 0, zoneTick = 0, findTick = 0, userSlot = false;
 let setupOpen = false, setupRow = 0, setupEdit = false, needPaint = true;
 
 /* ---------------------------------------------------------------- host --- */
@@ -73,20 +73,46 @@ function loadCfg() {
 }
 function saveCfg() { try { if (has('host_write_file')) host_write_file(SETTINGS_PATH, JSON.stringify(cfg)); } catch (e) {} }
 
-/* Find ChoralRoot in the slot, move its chord zone under the pads' roots, match its key to ours.
- * What it had is kept so leaving puts it back. */
-function attach() {
+/* What MIDI FX a slot holds: ['choralroot', ''] etc., or null when the slot could not be read. */
+function midiFxOf(slot) {
+  const cnt = parseInt(getP(slot, 'midi_fx_count') || '2', 10);
+  const list = [];
+  for (let i = 1; i <= Math.max(2, Math.min(8, cnt || 2)); i++) {
+    const m = getP(slot, 'midi_fx' + i + '_module');
+    if (m === null || m === undefined) { if (i === 1) return null; break; }
+    list.push(String(m));
+  }
+  return list;
+}
+const isCR = (m) => String(m || '').toLowerCase().includes('choralroot');
+
+/* Find ChoralRoot: the chosen slot first, then the others (and remember the one it is in). Then move its
+ * chord zone under the pads' roots and match its key to ours. What it had is kept so leaving puts it back. */
+let scanInfo = '';                  // what the chosen slot holds, for the screen when nothing is found
+function attach(anySlot = true) {
   detach();
-  for (const comp of ['midi_fx1', 'midi_fx2']) {
-    if (getP(cfg.slot, comp + '_module') !== 'choralroot') continue;
-    const rc = parseInt(getP(cfg.slot, 'slot:receive_channel') || '0', 10);
+  const order = (anySlot ? [cfg.slot, 0, 1, 2, 3] : [cfg.slot]).filter((s, i, a) => a.indexOf(s) === i);
+  let first = null;
+  for (const slot of order) {
+    const list = midiFxOf(slot);
+    if (slot === cfg.slot) first = list;
+    if (!list) continue;
+    const i = list.findIndex(isCR);
+    if (i < 0) continue;
+    if (slot !== cfg.slot) { cfg.slot = slot; saveCfg(); }
+    const comp = 'midi_fx' + (i + 1);
+    const rc = parseInt(getP(slot, 'slot:receive_channel') || '0', 10);
     const saved = {};
-    for (const k of ['mod_low', 'mod_map', 'key', 'scale']) saved[k] = getP(cfg.slot, comp + ':' + k);
-    fx = { comp, ch: rc >= 1 && rc <= 16 ? rc - 1 : cfg.slot, saved, zoneOk: false, checks: 0 };
+    for (const k of ['mod_low', 'mod_map', 'key', 'scale']) saved[k] = getP(slot, comp + ':' + k);
+    fx = { comp, ch: rc >= 1 && rc <= 16 ? rc - 1 : slot, saved, zoneOk: false, checks: 0 };
+    scanInfo = '';
     moveZone();
     syncKey();
     return;
   }
+  scanInfo = first === null ? 'cannot read slot ' + (cfg.slot + 1)
+    : 'S' + (cfg.slot + 1) + ' MIDI FX: ' + (first.filter((m) => m).join(', ') || 'none');
+  dirty = true;
 }
 function moveZone() {
   setP(cfg.slot, fx.comp + ':mod_low', ZONE_LOW);
@@ -202,8 +228,10 @@ function draw() {
   const bh = (cfg.sendTo === 'Move' ? 'MOVE ' : 'LIVE ') + (cfg.behaviour === 'Hold' ? 'HOLD' : 'MOM');
   print(126 - text_width(bh), 2, bh, 1);
   if (!fx) {
-    print(4, 24, 'No ChoralRoot in slot ' + (cfg.slot + 1), 1);
-    print(4, 36, 'Jog click: Setup', 1);
+    print(4, 16, 'No ChoralRoot found', 1);
+    print(4, 28, scanInfo || 'looking...', 1);
+    print(4, 40, 'Put it in MIDI FX', 1);
+    print(4, 52, 'of a slot (1-4)', 1);
     return;
   }
   const name = shownName || '--';
@@ -216,7 +244,7 @@ function draw() {
 /* ------------------------------------------------------------ controls --- */
 function delta(v) { return v >= 1 && v <= 63 ? 1 : v >= 65 && v <= 127 ? -1 : 0; }
 function editSetup(i, d) {
-  if (i === 0) { const s = (cfg.slot + d + 4) % 4; detach(); cfg.slot = s; attach(); }
+  if (i === 0) { const s = (cfg.slot + d + 4) % 4; detach(); cfg.slot = s; userSlot = true; attach(false); }
   if (i === 1) { releaseAll(); cfg.key = (cfg.key + d + 12) % 12; syncKey(); }
   if (i === 2) { releaseAll(); cfg.scale = cfg.scale === 'Major' ? 'Minor' : 'Major'; syncKey(); }
   if (i === 3) { releaseAll(); cfg.behaviour = cfg.behaviour === 'Hold' ? 'Momentary' : 'Hold'; }
@@ -268,6 +296,7 @@ globalThis.init = function () {
 globalThis.tick = function () {
   if (needPaint) { needPaint = false; paintAll(); }
   flushOneWrite();
+  if (!fx && !setupOpen && (++findTick % 40) === 0) { attach(!userSlot); if (fx) needPaint = true; }   // ChoralRoot added later
   if (fx && !fx.zoneOk && (++zoneTick % 4) === 0) checkZone();
   if (nameAsk > 0 && fx) {                              // ChoralRoot's own (Orchid) name, once it has played
     nameAsk--;
