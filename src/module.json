@@ -2,7 +2,7 @@
   "id": "choralroot",
   "name": "ChoralRoot",
   "abbrev": "CROOT",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "ChoralRoot FM-1's chord engine as a MIDI FX: one hand plays roots, eight notes shape the chord (dim min maj sus / 6 m7 M7 9), with voicing, Key Mode, bass and strum / slop / arp / pattern / harp",
   "author": "Luis (port); ChoralRoot engine by Quixotic7",
   "dsp": "dsp.so",
