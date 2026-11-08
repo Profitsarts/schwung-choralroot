@@ -1,14 +1,14 @@
 {
-  "version": "0.3.1",
-  "download_url": "https://github.com/Profitsarts/schwung-choralroot/releases/download/v0.3.1/choralroot-module.tar.gz",
+  "version": "0.3.2",
+  "download_url": "https://github.com/Profitsarts/schwung-choralroot/releases/download/v0.3.2/choralroot-module.tar.gz",
   "modules": {
     "choralroot": {
-      "version": "0.3.1",
-      "download_url": "https://github.com/Profitsarts/schwung-choralroot/releases/download/v0.3.1/choralroot-module.tar.gz"
+      "version": "0.3.2",
+      "download_url": "https://github.com/Profitsarts/schwung-choralroot/releases/download/v0.3.2/choralroot-module.tar.gz"
     },
     "choralroot-pads": {
-      "version": "0.3.1",
-      "download_url": "https://github.com/Profitsarts/schwung-choralroot/releases/download/v0.3.1/choralroot-pads-module.tar.gz"
+      "version": "0.3.2",
+      "download_url": "https://github.com/Profitsarts/schwung-choralroot/releases/download/v0.3.2/choralroot-pads-module.tar.gz"
     }
   }
 }
