@@ -50,4 +50,14 @@ ok(L.padColour(92, H('MIN'), new Set()) === L.LED.chordOn, 'held chord pad lit')
 ok(L.padColour(70, H(), new Set([70])) === L.LED.hit, 'pressed note pad lit');
 ok(L.padColour(70, H(), new Set()) === L.LED.root, 'tonic pad white');
 
+// Chromatic: the 24 note pads are two octaves of semitones, no Key mode
+{
+  const notes = Array.from({ length: 24 }, (_, i) => L.rootNote(i, 0, 'Chromatic', 0));
+  ok(notes.every((x, i) => x === 48 + i), 'Chromatic: C3..B4 in semitones');
+  ok(L.rootNote(0, 2, 'Chromatic', 0) === 50, 'Chromatic in D starts on D3');
+  ok(L.localChordName(50, H(), 0, 'Chromatic') === 'D', 'Chromatic, no chord pad: just the note (D)');
+  ok(L.localChordName(51, H('MIN'), 0, 'Chromatic') === 'D#m', 'Chromatic + MIN: D#m');
+  ok(L.padColour(86, H(), new Set(), 'Chromatic') === L.LED.root, 'Chromatic: the octave pad is a root pad');
+}
+
 console.log(`\nALL PASS (${n})`);
