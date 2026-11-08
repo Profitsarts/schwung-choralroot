@@ -60,4 +60,16 @@ ok(L.padColour(70, H(), new Set()) === L.LED.root, 'tonic pad white');
   ok(L.padColour(86, H(), new Set(), 'Chromatic') === L.LED.root, 'Chromatic: the octave pad is a root pad');
 }
 
+// Hold: one chord pad per column; the new one replaces the old one, the other column stays
+{
+  const st = { held: new Set() };
+  L.chordPress(st, L.padRole(92), true, 'Hold');            // MIN
+  L.chordPress(st, L.padRole(93), true, 'Hold');            // 6
+  const ev = L.chordPress(st, L.padRole(84), true, 'Hold'); // MAJ
+  ok(JSON.stringify(ev) === JSON.stringify([[0, 1], [1, 2]]), 'Hold: MAJ releases MIN, then latches');
+  ok([...st.held].sort().join() === '6,MAJ', 'Hold: the 6 in column 2 stays');
+  L.chordPress(st, L.padRole(85), true, 'Hold');            // 7
+  ok([...st.held].sort().join() === '7,MAJ', 'Hold: 7 replaces 6');
+}
+
 console.log(`\nALL PASS (${n})`);

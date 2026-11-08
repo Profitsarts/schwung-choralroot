@@ -41,7 +41,7 @@ export function padRole(n) {
   const { row, col } = padPos(n);
   if (col < 2) {
     const c = CHORD_GRID[col][3 - row];
-    return { kind: 'chord', id: c.id, mod: c.mod, zoneNote: ZONE_LOW + c.mod };
+    return { kind: 'chord', id: c.id, mod: c.mod, zoneNote: ZONE_LOW + c.mod, col };
   }
   return { kind: 'note', index: row * 6 + (col - 2) };
 }
@@ -58,8 +58,12 @@ export function chordPress(state, role, down, behaviour) {
   const ev = [];
   if (behaviour === 'Hold') {
     if (!down) return ev;
-    if (state.held.has(role.id)) { state.held.delete(role.id); ev.push([0, role.zoneNote]); }
-    else { state.held.add(role.id); ev.push([1, role.zoneNote]); }
+    if (state.held.has(role.id)) { state.held.delete(role.id); ev.push([0, role.zoneNote]); return ev; }
+    // one per column: a new triad replaces the held triad, a new extension the held extension
+    for (const c of CHORD_GRID[role.col] || []) {
+      if (c.id !== role.id && state.held.has(c.id)) { state.held.delete(c.id); ev.push([0, ZONE_LOW + c.mod]); }
+    }
+    state.held.add(role.id); ev.push([1, role.zoneNote]);
     return ev;
   }
   if (down && !state.held.has(role.id)) { state.held.add(role.id); ev.push([1, role.zoneNote]); }

@@ -163,6 +163,7 @@ function onPad(n, down, vel) {
   if (r.kind === 'chord') {
     for (const [on, z] of chordPress(chord, r, down, cfg.behaviour)) send((on ? 0x90 : 0x80) | fx.ch, z, on ? 100 : 0);
     if (!sounding.size) { shownName = pendingLabel(chord.held); notesLine = ''; }
+    needPaint = true;                              // in Hold a new pad can release another one
   } else if (down) {
     const note = rootNote(r.index, cfg.key, cfg.scale, cfg.octave);
     if (note < 0) return;
