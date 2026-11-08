@@ -31,13 +31,30 @@ const chord = { held: new Set() };
 const pressed = new Set();          // note pads down
 const sounding = new Map();         // pad -> root note sent (so its off matches its on)
 let fx = null;                      // { comp: 'midi_fx1', ch: 0..15, saved: {mod_low, mod_map, key, scale} }
-let shownName = '', notesLine = '', dirty = true, nameAsk = 0;
+let shownName = '', notesLine = '', dirty = true, nameAsk = 0, zoneTick = 0;
 let setupOpen = false, setupRow = 0, setupEdit = false, needPaint = true;
 
 /* ---------------------------------------------------------------- host --- */
 const has = (f) => typeof globalThis[f] === 'function';
 function getP(slot, key) { try { return has('shadow_get_param') ? shadow_get_param(slot, key) : null; } catch (e) { return null; } }
-function setP(slot, key, v) { try { if (has('shadow_set_param')) shadow_set_param(slot, key, String(v)); } catch (e) {} }
+/* Writes to the slot. While a tool is open Schwung runs in overtake mode, where shadow_set_param is
+ * fire-and-forget over ONE shared slot: back-to-back writes overwrite each other and only the last one lands
+ * (schwung shadow_ui.js, shadowSetParamBlocking). So use the blocking shadow_set_param_timeout, which waits
+ * for each write to be taken, and on a host without it send one write per tick. */
+const SET_TIMEOUT_MS = 200;
+const writes = [];                  // [slot, key, value] waiting for a tick (hosts without the blocking call)
+function setP(slot, key, v) {
+  try {
+    if (has('shadow_set_param_timeout')) { shadow_set_param_timeout(slot, key, String(v), SET_TIMEOUT_MS); return; }
+    const i = writes.findIndex((w) => w[0] === slot && w[1] === key);
+    if (i >= 0) writes.splice(i, 1);
+    writes.push([slot, key, String(v)]);
+  } catch (e) {}
+}
+function flushOneWrite() {
+  const w = writes.shift();
+  if (w) { try { if (has('shadow_set_param')) shadow_set_param(w[0], w[1], w[2]); } catch (e) {} }
+}
 function send(st, d1, d2) {
   if (cfg.sendTo === 'Move') {
     if (has('move_midi_inject_to_move')) move_midi_inject_to_move([0x20 | (st >> 4), st, d1 & 127, d2 & 127]);
@@ -65,12 +82,23 @@ function attach() {
     const rc = parseInt(getP(cfg.slot, 'slot:receive_channel') || '0', 10);
     const saved = {};
     for (const k of ['mod_low', 'mod_map', 'key', 'scale']) saved[k] = getP(cfg.slot, comp + ':' + k);
-    fx = { comp, ch: rc >= 1 && rc <= 16 ? rc - 1 : cfg.slot, saved };
-    setP(cfg.slot, comp + ':mod_low', ZONE_LOW);
-    setP(cfg.slot, comp + ':mod_map', 'Semitones');
+    fx = { comp, ch: rc >= 1 && rc <= 16 ? rc - 1 : cfg.slot, saved, zoneOk: false, checks: 0 };
+    moveZone();
     syncKey();
     return;
   }
+}
+function moveZone() {
+  setP(cfg.slot, fx.comp + ':mod_low', ZONE_LOW);
+  setP(cfg.slot, fx.comp + ':mod_map', 'Semitones');
+}
+/* Reads the zone back: until ChoralRoot says mod_low = 0, the chord pads would play as roots. */
+function checkZone() {
+  if (!fx || fx.zoneOk || writes.length) return;
+  const low = getP(cfg.slot, fx.comp + ':mod_low'), map = getP(cfg.slot, fx.comp + ':mod_map');
+  if (String(low) === String(ZONE_LOW) && (map === null || map === 'Semitones')) { fx.zoneOk = true; dirty = true; return; }
+  if (++fx.checks <= 5) { moveZone(); syncKey(); }
+  dirty = true;
 }
 function syncKey() {
   if (!fx) return;
@@ -80,7 +108,14 @@ function syncKey() {
 function detach() {
   releaseAll();
   if (!fx) return;
-  for (const k in fx.saved) if (fx.saved[k] !== null && fx.saved[k] !== undefined && fx.saved[k] !== '') setP(cfg.slot, fx.comp + ':' + k, fx.saved[k]);
+  writes.length = 0;
+  // the zone last: on a host without the blocking call, the last write is the one that lands
+  for (const k of ['key', 'scale', 'mod_map', 'mod_low']) {
+    const v = fx.saved[k];
+    if (v === null || v === undefined || v === '') continue;
+    if (has('shadow_set_param_timeout')) setP(cfg.slot, fx.comp + ':' + k, v);
+    else { try { if (has('shadow_set_param')) shadow_set_param(cfg.slot, fx.comp + ':' + k, String(v)); } catch (e) {} }
+  }
   fx = null;
 }
 
@@ -173,7 +208,7 @@ function draw() {
   }
   const name = shownName || '--';
   big(name, 22, name.length > 9 ? 2 : 3 * 6 * name.length <= 126 ? 3 : 2);
-  print(2, 54, notesLine || ' ', 1);
+  print(2, 54, fx.zoneOk ? (notesLine || ' ') : fx.checks > 5 ? 'CHORD ZONE FAILED' : 'linking...', 1);
   const oc = 'OCT ' + (cfg.octave > 0 ? '+' : '') + cfg.octave;
   print(126 - text_width(oc), 54, oc, 1);
 }
@@ -232,6 +267,8 @@ globalThis.init = function () {
 
 globalThis.tick = function () {
   if (needPaint) { needPaint = false; paintAll(); }
+  flushOneWrite();
+  if (fx && !fx.zoneOk && (++zoneTick % 4) === 0) checkZone();
   if (nameAsk > 0 && fx) {                              // ChoralRoot's own (Orchid) name, once it has played
     nameAsk--;
     const n = getP(cfg.slot, fx.comp + ':chord');

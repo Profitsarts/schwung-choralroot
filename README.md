@@ -88,6 +88,10 @@ ese mismo canal (la configuración de 4 pistas con canales 1-4).
 El slot elegido tiene que llevar ChoralRoot como MIDI FX. Mientras el tool está abierto, mueve la
 zona de acordes de ChoralRoot a las notas 0-7 y le pone la misma tonalidad. Al salir lo restaura.
 
+Abajo a la izquierda pone **linking...** hasta que ChoralRoot confirma que su zona de acordes ya está en
+0-7 (tarda una fracción de segundo). Si pone **CHORD ZONE FAILED**, las columnas de acorde no van a
+funcionar: sal con Back y vuelve a abrir el tool.
+
 ## Compilar y probar
 
 ```sh
@@ -122,7 +126,8 @@ Están en `chain_patches/`, y también dentro del tarball, en `choralroot/chain_
   también suena en otros pads. Funciona mejor con un teclado externo o con un layout donde las notas no se
   repitan, o con ChoralRoot Pads.
 - No hay pantalla propia todavía: solo las páginas de knobs.
-- ChoralRoot Pads está probado con un host simulado, no todavía en un Move real.
+- ChoralRoot Pads está probado con un host simulado que imita el modo overtake de Schwung, conectado al
+  motor ChoralRoot real compilado para el ordenador (`tests/pads_e2e.test.mjs`), todavía no en un Move real.
 - Los chord pads y el looper de ChoralRoot no están portados.
 
 ## Licencia

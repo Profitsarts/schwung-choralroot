@@ -19,6 +19,7 @@ const sent = [], injected = [], leds = {}; let blocked = null, exited = false, f
 Object.assign(globalThis, {
   shadow_get_param: (s, k) => params[s + ':' + k] ?? null,
   shadow_set_param: (s, k, v) => { params[s + ':' + k] = v; return true; },
+  shadow_set_param_timeout: (s, k, v) => { params[s + ':' + k] = v; return true; },
   shadow_send_midi_to_dsp: (m) => { sent.push(m); return true; },
   move_midi_inject_to_move: (p) => { injected.push(p); sent.push(p.slice(1)); return true; },
   move_midi_internal_send: (m) => { leds[m[2]] = m[3]; },
